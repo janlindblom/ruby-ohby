@@ -3,10 +3,10 @@ require "httparty"
 require "ohby/version"
 require "ohby/too_long_error"
 
-# Generate "oh by" codes.
+# Generate "oh by" (0x) codes.
 #
 # @author Jan Lindblom <janlindblom@fastmail.fm>
-# @version 0.1.0
+# @version 0.0.1
 module Ohby
   include HTTParty
   base_uri 'https://0x.co'
@@ -19,6 +19,7 @@ module Ohby
   # @param expiry [String] expiration
   # @param is_public [Boolean] visibility
   # @raise [TooLongError] if the payload is to long.
+  # @since 0.0.1
   def self.code(payload=nil,expiry=0,is_public=true)
     shorten(payload,expiry,is_public,false)
   end
@@ -31,6 +32,7 @@ module Ohby
   # @param expiry [String] expiration
   # @param is_public [Boolean] visibility
   # @raise [TooLongError] if the payload is to long.
+  # @since 0.0.1
   def self.redirect(payload=nil,expiry=0,is_public=true)
     shorten(payload,expiry,is_public,true)
   end
@@ -50,6 +52,7 @@ module Ohby
   # @param expiry [String] expiration
   # @param is_public [Boolean] visibility
   # @raise [TooLongError] if the payload is to long.
+  # @since 0.0.1
   def self.shorten(payload=nil,expiry=0,is_public=true,redirect=false)
     is_url = redirect ? true : false
 
@@ -66,12 +69,12 @@ module Ohby
       body: {
         content: payload,
         expiry: expiry,
-        public: is_public == true ? 1 : 0
+        public: is_public ? 1 : 0
       }
     }
 
     unless payload.nil?
-      raise TooLongError.new("Payload to large, exceds 4096 characters.") if payload.size > 4096
+      raise TooLongError.new("Payload too long, exceds 4096 characters.") if payload.size > 4096
 
       if redirect == true
         opts[:body][:redirect] = 1
