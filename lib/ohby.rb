@@ -1,7 +1,9 @@
-require "uri"
-require "httparty"
-require "ohby/version"
-require "ohby/too_long_error"
+require 'uri'
+require 'httparty'
+require 'ohby/version'
+require 'ohby/too_long_error'
+require 'ohby/wrong_code_format_error'
+require 'ohby/code'
 
 # Generate "oh by" (0x) codes.
 #
@@ -56,6 +58,7 @@ module Ohby
   def self.shorten(payload=nil,expiry=0,is_public=true,redirect=false)
     is_url = redirect ? true : false
 
+    # Check if the message is a URL to decide whether or not to set redirect.
     begin
       uri = URI.parse(payload)
       if uri.is_a? URI::HTTP or uri.is_a? URI::HTTPS
@@ -74,7 +77,8 @@ module Ohby
     }
 
     unless payload.nil?
-      raise TooLongError.new("Payload too long, exceds 4096 characters.") if payload.size > 4096
+      raise TooLongError.new(
+        "Payload too long, exceds 4096 characters.") if payload.size > 4096
 
       if redirect == true
         opts[:body][:redirect] = 1
@@ -85,8 +89,70 @@ module Ohby
       end
 
       opts
-      #self.class.post("/shorten.html", opts)
+      #post("/shorten.html", opts)
     end
+  end
+
+  # Look up an existing 0x-code to see what it contains.
+  #
+  # @param code [String] the code to look up
+  def self.lookup(code=nil)
+    require 'strscan'
+    raise WrongCodeFormatError.new(
+      "Bad code format, should be a simple String.") unless code.is_a? String
+    raise WrongCodeFormatError.new("Bad code, cannot be nil.") if code.nil?
+
+    # Strip any "0x" from the supplied string.
+    payload = code.start_with?("0x") ? code.slice(2..-1) : code
+
+    # Perform lookup by posting to form, this way we get an empty xml back if
+    # the code is not found.
+    response = post("/lookup_redir.html", { body: { qrdcode: code } })
+
+    code_section = response.gsub(/\n/,'').match(
+      /\<script.*id=\"code\".*application\/xml.*\>.*\<\/script\>/)[0]
+    scanner = StringScanner.new(code_section)
+    scanner.skip(/\<script.*\"application\/xml\"\>/)
+    response_xml = scanner.scan_until(/\<\/script\>/)
+    response_xml.gsub!(/\<\/script\>/,'').strip!
+    require 'rexml/document'
+    document = REXML::Document.new "<ohby>" + response_xml + "</ohby>"
+    response_hash = {}
+    code_object = Ohby::Code.new
+
+    document.root.elements.each do |element|
+      setter = element.name.to_s + "="
+      case element.name
+      when "code", "message", "hash"
+        code_object.send(setter, process_text(element))
+      when "date"
+        code_object.send(setter,
+                         process_string_into_datetime(process_text(element)))
+      when "expires"
+        code_object.send(setter,
+                         process_text(element) == "" ?
+                         "0" : process_text(element))
+      when "visibility", "redirect"
+        code_object.send(setter,
+                         process_string_into_boolean(process_text(element)))
+      end
+    end
+    code_object
+  end
+
+  private
+
+  def self.process_text(element)
+    element.has_text? ? element.get_text.to_s : ""
+  end
+
+  def self.process_string_into_datetime(text)
+    DateTime.parse(text + " PST")
+  end
+
+  def self.process_string_into_boolean(text)
+    return true if text == "1"
+    false
   end
 
 end
