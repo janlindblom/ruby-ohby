@@ -1,5 +1,7 @@
 # Ohby
 
+[![Gem Version](https://badge.fury.io/rb/ohby.svg)](https://badge.fury.io/rb/ohby)
+
 Access the "oh by" shortener (https://0x.co) from your code.
 
 ## Installation
