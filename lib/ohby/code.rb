@@ -2,8 +2,8 @@ module Ohby
   # Object representation of an 0x-code.
   #
   # @author Jan Lindblom <janlindblom@fastmail.fm>
-  # @version 0.0.1
-  # @since 0.0.1
+  # @version 0.1.0
+  # @since 0.1.0
   class Code < Object
     # The code itself
     attr_accessor :code

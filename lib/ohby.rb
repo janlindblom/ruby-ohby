@@ -11,7 +11,7 @@ require 'ohby/code'
 # Generate "oh by" (0x) codes.
 #
 # @author Jan Lindblom <janlindblom@fastmail.fm>
-# @version 0.0.1
+# @version 0.1.0
 module Ohby
 
   # Generate an "oh by" code from a given payload.
@@ -22,7 +22,7 @@ module Ohby
   # @param expiry [String] expiration
   # @param is_public [Boolean] visibility
   # @raise [TooLongError] if the payload is to long.
-  # @since 0.0.1
+  # @since 0.1.0
   def self.code(payload=nil,expiry=0,is_public=true)
     shorten(payload,expiry,is_public,false)
   end
@@ -35,7 +35,7 @@ module Ohby
   # @param expiry [String] expiration
   # @param is_public [Boolean] visibility
   # @raise [TooLongError] if the payload is to long.
-  # @since 0.0.1
+  # @since 0.1.0
   def self.redirect(payload=nil,expiry=0,is_public=true)
     shorten(payload,expiry,is_public,true)
   end
@@ -56,7 +56,7 @@ module Ohby
   # @param is_public [Boolean] visibility
   # @raise [TooLongError] if the payload is to long.
   # @raise [CodeGenerationError] if the payload couldn't be shortened.
-  # @since 0.0.1
+  # @since 0.1.0
   def self.shorten(payload=nil,expiry=0,is_public=true,redirect=false)
     base_uri = "https://0x.co/shorten.html"
     is_url = redirect ? true : false
