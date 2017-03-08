@@ -33,5 +33,4 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rake", "~> 10"
   spec.add_development_dependency "rspec", "~> 3"
   spec.add_development_dependency "pry", "~> 0.10"
-  spec.add_runtime_dependency "httparty", "~> 0.14"
 end

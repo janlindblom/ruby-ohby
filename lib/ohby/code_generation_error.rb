@@ -1,9 +1,9 @@
 module Ohby
-  # An error indicating the input is malformed in some way.
-  #
+  # An error during oh by code generation.
+  # 
   # @author Jan Lindblom <janlindblom@fastmail.fm>
   # @version 0.0.1
   # @since 0.0.1
-  class WrongCodeFormatError < StandardError
+  class CodeGenerationError < StandardError
   end
 end

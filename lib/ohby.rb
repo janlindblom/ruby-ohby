@@ -1,8 +1,10 @@
 require 'net/http'
 require 'uri'
-#require 'httparty'
+require 'strscan'
+require 'date'
 require 'ohby/version'
 require 'ohby/too_long_error'
+require 'ohby/code_generation_error'
 require 'ohby/wrong_code_format_error'
 require 'ohby/code'
 
@@ -11,8 +13,6 @@ require 'ohby/code'
 # @author Jan Lindblom <janlindblom@fastmail.fm>
 # @version 0.0.1
 module Ohby
-  #include HTTParty
-  base_uri 'https://0x.co'
 
   # Generate an "oh by" code from a given payload.
   #
@@ -55,31 +55,19 @@ module Ohby
   # @param expiry [String] expiration
   # @param is_public [Boolean] visibility
   # @raise [TooLongError] if the payload is to long.
+  # @raise [CodeGenerationError] if the payload couldn't be shortened.
   # @since 0.0.1
   def self.shorten(payload=nil,expiry=0,is_public=true,redirect=false)
+    base_uri = "https://0x.co/shorten.html"
     is_url = redirect ? true : false
 
     # Check if the message is a URL to decide whether or not to set redirect.
-    begin
-      uri = URI.parse(payload)
-      if uri.is_a? URI::HTTP or uri.is_a? URI::HTTPS
-        is_url = true
-      end
-    rescue URI::InvalidURIError
-      is_url = false
-    end
+    is_url = check_if_message_is_url(payload)
 
-    opts = {
-      body: {
-        content: payload,
-        expiry: expiry,
-        public: is_public ? 1 : 0
-      }
-    }
     request = {
         "content" => payload,
         "expiry" => expiry.to_s,
-        "public" => is_public? ? "1" : "0"
+        "public" => is_public ? "1" : "0"
     }
 
     unless payload.nil?
@@ -87,19 +75,27 @@ module Ohby
         "Payload too long, exceds 4096 characters.") if payload.size > 4096
 
       if redirect == true
-        opts[:body][:redirect] = 1
         request["redirect"] = "1"
       elsif redirect != false && is_url
-        opts[:body][:redirect] = 1
         request["redirect"] = "1"
       elsif redirect == false && is_url
-        opts[:body][:redirect] = 0
         request["redirect"] = "0"
       end
 
-      opts
-      #post("/shorten.html", opts)
-      Net::HTTP.post_form(URI(base_uri + "/shorten.html"), request)
+      # Do a POST request and get the body if everything worked out.
+      post = Net::HTTP.post_form(URI(base_uri), request)
+      unless post.response.is_a? Net::HTTPOK
+        raise CodeGenerationError.new("Unable to perform request.") 
+      end
+      result = post.body
+      # Get the <body> and set up a scanner on it
+      scanner = StringScanner.new(
+          result.gsub(/\n/,'').match(/<body>(.*)<\/body>/)[1])
+      # Find the part with the code
+      scanner.skip_until /0 x /
+      # Get the code (asciinumeral) from the scanner
+      code=scanner.scan /[A-z0-9]+/
+      code
     end
   end
 
@@ -107,7 +103,7 @@ module Ohby
   #
   # @param code [String] the code to look up
   def self.lookup(code=nil)
-    require 'strscan'
+    base_uri = "https://0x.co/"
     require 'rexml/document'
     raise WrongCodeFormatError.new(
       "Bad code format, should be a simple String.") unless code.is_a? String
@@ -118,15 +114,16 @@ module Ohby
 
     # Perform lookup by posting to form, this way we get an empty xml back if
     # the code is not found.
-    response = Net::HTTP.get(URI(base_uri + "/" + payload))
+    response = Net::HTTP.get(URI(base_uri + payload))
 
     code_section = response.gsub(/\n/,'').match(
-      /\<script.*id=\"code\".*application\/xml.*\>.*\<\/script\>/)[0]
+      /<script.*id=\"code\".*application\/xml.*>.*<\/script>/)[0]
 
     scanner = StringScanner.new(code_section)
-    scanner.skip(/\<script.*\"application\/xml\"\>/)
-    response_xml = scanner.scan_until(/\<\/script\>/)
-    response_xml.gsub!(/\<\/script\>/,'').strip!
+    end_tag = /\<\/script>/
+    scanner.skip(/<script.*\"application\/xml\">/)
+    response_xml = scanner.scan_until(end_tag)
+    response_xml.gsub!(end_tag,'').strip!
     
     document = REXML::Document.new "<ohby>" + response_xml + "</ohby>"
     response_hash = {}
@@ -135,19 +132,21 @@ module Ohby
 
     document.root.elements.each do |element|
       setter = element.name.to_s + "="
+      processed = process_text(element)
+      
       case element.name
       when "code", "message", "hash"
-        code_object.send(setter, process_text(element))
+        code_object.send(setter, processed)
       when "date"
         code_object.send(setter,
-                         process_string_into_datetime(process_text(element)))
+                         process_string_into_datetime(processed))
       when "expires"
         code_object.send(setter,
                          process_text(element) == "" ? "" :
-                         process_string_into_datetime(process_text(element)))
+                         process_string_into_datetime(processed))
       when "visibility", "redirect"
         code_object.send(setter,
-                         process_string_into_boolean(process_text(element)))
+                         process_string_into_boolean(processed))
       end
     end
     code_object
@@ -168,6 +167,18 @@ module Ohby
   def self.process_string_into_boolean(text)
     return true if text == "1"
     false
+  end
+
+  def self.check_if_message_is_url(text)
+    is_url = false
+    begin
+      uri = URI.parse(text)
+      if uri.is_a? URI::HTTP or uri.is_a? URI::HTTPS
+        is_url = true
+      end
+    rescue URI::InvalidURIError
+    end
+    is_url
   end
 
 end
