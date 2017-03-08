@@ -1,6 +1,6 @@
 # Ohby
 
-Access the "oh by" shortener from your code.
+Access the "oh by" shortener (https://0x.co) from your code.
 
 ## Installation
 
@@ -20,7 +20,24 @@ Or install it yourself as:
 
 ## Usage
 
-TODO: Write usage instructions here
+Use it like so:
+
+```ruby
+require 'ohby'
+
+# a public message, expiring in 10 minutes
+code = Ohby.shorten "a message", "10m"
+```
+
+or to look up a code:
+
+```ruby
+require 'ohby'
+
+message = Ohby.lookup "HVRMFJ"
+```
+
+Nothing else needed really. Read the docs for details.
 
 ## Development
 
