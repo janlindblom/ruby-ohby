@@ -1,8 +1,6 @@
 # Ohby
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/ohby`. To experiment with that code, run `bin/console` for an interactive prompt.
-
-TODO: Delete this and the text above, and describe your gem
+Access the "oh by" shortener (https://0x.co) from your code.
 
 ## Installation
 
@@ -22,7 +20,24 @@ Or install it yourself as:
 
 ## Usage
 
-TODO: Write usage instructions here
+Use it like so:
+
+```ruby
+require 'ohby'
+
+# a public message, expiring in 10 minutes
+code = Ohby.shorten "a message", "10m"
+```
+
+or to look up a code:
+
+```ruby
+require 'ohby'
+
+message = Ohby.lookup "HVRMFJ"
+```
+
+Nothing else needed really. Read the docs for details.
 
 ## Development
 
@@ -32,7 +47,7 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/ohby. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](http://contributor-covenant.org) code of conduct.
+Bug reports and pull requests are welcome on Bitbucket at https://bitbucket.org/janlindblom/ohby-ruby. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](http://contributor-covenant.org) code of conduct.
 
 
 ## License
