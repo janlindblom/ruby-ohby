@@ -11,4 +11,5 @@ pipelines:
         script: # Modify the commands below to build your repository.
           - bundler --version
           - bundle install
+          - rake spec
           - rake yard
