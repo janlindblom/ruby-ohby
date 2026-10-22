@@ -59,7 +59,6 @@ module Ohby
   # @since 0.1.0
   def self.shorten(payload=nil,expiry=0,is_public=true,redirect=false)
     base_uri = "https://0x.co/shorten.html"
-    is_url = redirect ? true : false
 
     # Check if the message is a URL to decide whether or not to set redirect.
     is_url = check_if_message_is_url(payload)
@@ -72,7 +71,7 @@ module Ohby
 
     unless payload.nil?
       raise TooLongError.new(
-        "Payload too long, exceds 4096 characters.") if payload.size > 4096
+        "Payload too long, exceeds 4096 characters.") if payload.size > 4096
 
       if redirect == true
         request["redirect"] = "1"
@@ -82,19 +81,35 @@ module Ohby
         request["redirect"] = "0"
       end
 
+      uri = URI(base_uri)
+
       # Do a POST request and get the body if everything worked out.
-      post = Net::HTTP.post_form(URI(base_uri), request)
-      unless post.response.is_a? Net::HTTPOK
-        raise CodeGenerationError.new("Unable to perform request.") 
+      begin
+        post = Net::HTTP.start(uri.host, uri.port,
+                               use_ssl: uri.is_a?(URI::HTTPS),
+                               open_timeout: 10,
+                               read_timeout: 10) do |http|
+          http.post_form(uri, request)
+        end
+      rescue => error
+        raise CodeGenerationError.new(
+          "Unable to perform request: #{error.message}")
       end
+
+      unless post.is_a? Net::HTTPOK
+        raise CodeGenerationError.new("Unable to perform request.")
+      end
+
       result = post.body
       # Get the <body> and set up a scanner on it
-      scanner = StringScanner.new(
-          result.gsub(/\n/,'').match(/<body>(.*)<\/body>/)[1])
+      body = result.gsub(/\n/, '').match(/<body>(.*)<\/body>/m)
+      raise CodeGenerationError.new("Unexpected response from 0x.co.") if body.nil?
+
+      scanner = StringScanner.new(body[1])
       # Find the part with the code
-      scanner.skip_until /0 x /
+      scanner.skip_until(/0 x /)
       # Get the code (asciinumeral) from the scanner
-      code=scanner.scan /[A-z0-9]+/
+      code = scanner.scan(/[A-Za-z0-9]+/)
       code
     end
   end
@@ -114,18 +129,34 @@ module Ohby
 
     # Perform lookup by posting to form, this way we get an empty xml back if
     # the code is not found.
-    response = Net::HTTP.get(URI(base_uri + payload))
+    uri = URI(base_uri + URI::DEFAULT_PARSER.escape(payload))
 
-    code_section = response.gsub(/\n/,'').match(
-      /<script.*id=\"code\".*application\/xml.*>.*<\/script>/)[0]
+    response = nil
+    begin
+      response = Net::HTTP.start(uri.host, uri.port,
+                                 use_ssl: uri.is_a?(URI::HTTPS),
+                                 open_timeout: 10,
+                                 read_timeout: 10) do |http|
+        http.get(uri)
+      end
+    rescue => error
+      raise CodeGenerationError.new(
+        "Unable to perform lookup: #{error.message}")
+    end
 
-    scanner = StringScanner.new(code_section)
-    end_tag = /\<\/script>/
-    scanner.skip(/<script.*\"application\/xml\">/)
+    code_section = response.body.gsub(/\n/, '').match(
+      /<script.*id="code".*application\/xml.*>.*<\/script>/m)
+    raise CodeGenerationError.new("Unexpected response from 0x.co.") if code_section.nil?
+
+    scanner = StringScanner.new(code_section[0])
+    end_tag = /<\/script>/
+    scanner.skip(/<script.*"application\/xml">/)
     response_xml = scanner.scan_until(end_tag)
-    response_xml.gsub!(end_tag,'').strip!
-    
-    document = REXML::Document.new "<ohby>" + response_xml + "</ohby>"
+    raise CodeGenerationError.new("Unexpected response from 0x.co.") if response_xml.nil?
+    response_xml.gsub!(end_tag, '').strip!
+
+    document = REXML::Document.new("<ohby>" + response_xml + "</ohby>")
+
     response_hash = {}
     
     code_object = Ohby::Code.new
@@ -161,6 +192,7 @@ module Ohby
   # Appends "PST" to all datetime strings since 0x.co timestamps are given
   # in PST (not really documented anywhere though)
   def self.process_string_into_datetime(text)
+    return nil if text.nil? || text.empty?
     DateTime.parse(text + " PST")
   end
 
@@ -176,7 +208,7 @@ module Ohby
       if uri.is_a? URI::HTTP or uri.is_a? URI::HTTPS
         is_url = true
       end
-    rescue URI::InvalidURIError
+    rescue URI::Error
     end
     is_url
   end
